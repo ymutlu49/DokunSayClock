@@ -111,12 +111,12 @@ export default function App(){
   useEffect(function(){if(!dragH)return;
     function ga(e){if(!cRef.current)return 0;var r=cRef.current.getBoundingClientRect();return(Math.atan2(e.clientY-(r.top+r.height/2),e.clientX-(r.left+r.width/2))*180/Math.PI+90+360)%360;}
     function snap5(raw){var n5=Math.round(raw/5)*5;return Math.abs(raw-n5)<=1.2?n5%60:Math.round(raw)%60;}
-    function onM(e){if(e.buttons===0){setDragH(null);return;}var a=ga(e);
+    function onM(e){if(e.pointerType!=="touch"&&e.buttons===0){setDragH(null);return;}var a=ga(e);
       if(dragH==="min"){var newM=snap5(a/6);if(geared){var oldM=prevMinRef.current;var df=newM-oldM;if(df>30)df-=60;if(df<-30)df+=60;if(df!==0)setHour(function(h){var tot=((h%12)*60+oldM)+df;if(tot<0)tot+=720;return(Math.floor(tot%720/60)||12);});}prevMinRef.current=newM;setMin(newM);}
       else{var nh2=Math.round(a/30)%12;setHour(nh2===0?12:nh2);}}
     function onU(){setDragH(null);}
-    window.addEventListener("pointermove",onM);window.addEventListener("pointerup",onU);
-    return function(){window.removeEventListener("pointermove",onM);window.removeEventListener("pointerup",onU);};});
+    window.addEventListener("pointermove",onM);window.addEventListener("pointerup",onU);window.addEventListener("pointercancel",onU);
+    return function(){window.removeEventListener("pointermove",onM);window.removeEventListener("pointerup",onU);window.removeEventListener("pointercancel",onU);};});
 
   useEffect(function(){if(!liveMode)return;function tick(){var now=new Date();setHour(now.getHours()%12||12);setMin(now.getMinutes());}tick();var iv=setInterval(tick,1000);return function(){clearInterval(iv);};},[liveMode]);
 
@@ -133,19 +133,25 @@ export default function App(){
     else tgt={x:best.x,y:best.y};tgt.d=bestD;return tgt;}
 
   /* Sidebar→kanvas */
-  useEffect(function(){if(!sDr)return;
+  useEffect(function(){if(!sDr)return;var startX=sDp.x,startY=sDp.y,moved=false;
     function ck(ex,ey){if(!cvRef.current)return false;var r=cvRef.current.getBoundingClientRect();return ex>r.left-40&&ex<r.right+40&&ey>r.top-40&&ey<r.bottom+40;}
-    function onM(e){if(e.buttons===0){setSDr(null);setDropH(false);return;}setSDp({x:e.clientX,y:e.clientY});setDropH(ck(e.clientX,e.clientY));}
-    function onU(e){setDropH(false);setSnapHint(null);if(cvRef.current&&ck(e.clientX,e.clientY)){var r=cvRef.current.getBoundingClientRect();var rx=(e.clientX-r.left)/zoom,ry=(e.clientY-r.top)/zoom;
-      var dx=Math.max(0,rx-svS/2),dy=Math.max(0,ry-svS/2);
-      if(sDr.t!=="quad"&&sDr.t!=="digi"&&sDr.t!=="verb"){var sn=snapCalc(dx,dy,sDr.t,sDr.v);if(sn){dx=sn.x;dy=sn.y;}}
-      addItem(sDr.t,sDr.v,dx,dy);}setSDr(null);}
-    window.addEventListener("pointermove",onM);window.addEventListener("pointerup",onU);
-    return function(){window.removeEventListener("pointermove",onM);window.removeEventListener("pointerup",onU);};});
+    function placeTap(){/* Dokunarak yerleştir - kanvasın ortasına */if(!cvRef.current)return;var r=cvRef.current.getBoundingClientRect();var cx=(r.width/2)/zoom-svS/4,cy=(r.height/2)/zoom-svS/4;
+      if(sDr.t!=="quad"&&sDr.t!=="digi"&&sDr.t!=="verb"){var sn=snapCalc(cx,cy,sDr.t,sDr.v);if(sn){cx=sn.x;cy=sn.y;}}
+      addItem(sDr.t,sDr.v,cx,cy);}
+    function onM(e){if(e.pointerType!=="touch"&&e.buttons===0){setSDr(null);setDropH(false);return;}var dx=e.clientX-startX,dy=e.clientY-startY;if(Math.abs(dx)>8||Math.abs(dy)>8)moved=true;setSDp({x:e.clientX,y:e.clientY});setDropH(ck(e.clientX,e.clientY));}
+    function onU(e){setDropH(false);setSnapHint(null);
+      if(!moved){/* Dokunma = kanvasa yerleştir */placeTap();setSDr(null);return;}
+      if(cvRef.current&&ck(e.clientX,e.clientY)){var r=cvRef.current.getBoundingClientRect();var rx=(e.clientX-r.left)/zoom,ry=(e.clientY-r.top)/zoom;
+      var dx2=Math.max(0,rx-svS/2),dy2=Math.max(0,ry-svS/2);
+      if(sDr.t!=="quad"&&sDr.t!=="digi"&&sDr.t!=="verb"){var sn=snapCalc(dx2,dy2,sDr.t,sDr.v);if(sn){dx2=sn.x;dy2=sn.y;}}
+      addItem(sDr.t,sDr.v,dx2,dy2);}setSDr(null);}
+    function onCancel(){setDropH(false);setSnapHint(null);setSDr(null);}
+    window.addEventListener("pointermove",onM);window.addEventListener("pointerup",onU);window.addEventListener("pointercancel",onCancel);
+    return function(){window.removeEventListener("pointermove",onM);window.removeEventListener("pointerup",onU);window.removeEventListener("pointercancel",onCancel);};});
 
   /* Kanvas öğe sürükleme */
   useEffect(function(){if(!iDrag){setShowTrash(false);setOverTrash(false);setSnapHint(null);return;}setShowTrash(true);
-    function onM(e){if(e.buttons===0){setIDrag(null);return;}if(!cvRef.current)return;var r=cvRef.current.getBoundingClientRect();
+    function onM(e){if(e.pointerType!=="touch"&&e.buttons===0){setIDrag(null);return;}if(!cvRef.current)return;var r=cvRef.current.getBoundingClientRect();
       var nx=(e.clientX-r.left)/zoom-iDrag.offX,ny=(e.clientY-r.top)/zoom-iDrag.offY;setOverTrash(e.clientY>r.bottom-50);
       var dit=items.find(function(it){return it.id===iDrag.id;});
       if(dit&&(dit.t==="handH"||dit.t==="handM"||dit.t==="hnum"||dit.t==="mnum"||dit.t==="h24"||dit.t==="quad")){
@@ -158,10 +164,11 @@ export default function App(){
       else{var d2=items.find(function(it){return it.id===iDrag.id;});if(d2){
         var sn2=snapCalc(d2.x,d2.y,d2.t,d2.v,d2.t==="quad"?d2.id:undefined);if(sn2)moveItem(iDrag.id,sn2.x,sn2.y);}}
       setIDrag(null);}
-    window.addEventListener("pointermove",onM);window.addEventListener("pointerup",onU);
-    return function(){window.removeEventListener("pointermove",onM);window.removeEventListener("pointerup",onU);};});
+    function onCancel(){setSnapHint(null);setIDrag(null);}
+    window.addEventListener("pointermove",onM);window.addEventListener("pointerup",onU);window.addEventListener("pointercancel",onCancel);
+    return function(){window.removeEventListener("pointermove",onM);window.removeEventListener("pointerup",onU);window.removeEventListener("pointercancel",onCancel);};});
 
-  function stSD(t,v,e){e.preventDefault();setSDr({t:t,v:v});setSDp({x:e.clientX,y:e.clientY});}
+  function stSD(t,v,e){e.preventDefault();if(e.target&&e.target.setPointerCapture)try{e.target.releasePointerCapture(e.pointerId);}catch(ex){}setSDr({t:t,v:v});setSDp({x:e.clientX,y:e.clientY});}
   function startItemDrag(id,e){e.preventDefault();e.stopPropagation();var r=e.currentTarget.getBoundingClientRect();setIDrag({id:id,offX:(e.clientX-r.left)/zoom,offY:(e.clientY-r.top)/zoom});}
   function loadA(tp){setATpl(tp);setInsS(tp);if(tp.s){placeAll();setHour(tp.s.h);setMin(tp.s.m);}}
 
@@ -263,7 +270,7 @@ export default function App(){
               {/* Kadranlar */}
               <div style={{background:"#fff",borderRadius:14,padding:"12px",marginBottom:10,border:"1px solid rgba(0,0,0,.05)"}}>
                 <div style={{fontSize:10,fontWeight:800,textTransform:"uppercase",letterSpacing:1.5,color:"#b45309",marginBottom:10}}>{"🕐 Kadran Parçaları"}</div>
-                <div style={{position:"relative",width:130,height:130,margin:"0 auto"}}>{[3,0,2,1].map(function(q){var cx=65,cy=65,rr=58;var sa=[-90,0,90,180][q]*Math.PI/180,ea=([-90,0,90,180][q]+90)*Math.PI/180;var pd2="M"+cx+","+cy+" L"+(cx+rr*Math.cos(sa)).toFixed(1)+","+(cy+rr*Math.sin(sa)).toFixed(1)+" A"+rr+","+rr+" 0 0 1 "+(cx+rr*Math.cos(ea)).toFixed(1)+","+(cy+rr*Math.sin(ea)).toFixed(1)+" Z";return <svg key={q} width={130} height={130} style={{position:"absolute",top:0,left:0,pointerEvents:"none"}}><path d={pd2} fill={P.face} stroke={P.border} strokeWidth={2.5} style={{cursor:"grab",pointerEvents:"auto"}} onPointerDown={function(e){stSD("quad",q,e);}}/></svg>;})}<div style={{position:"absolute",left:62,top:62,width:6,height:6,borderRadius:"50%",background:"#999"}}/></div>
+                <div style={{position:"relative",width:130,height:130,margin:"0 auto"}}>{[3,0,2,1].map(function(q){var cx=65,cy=65,rr=58;var sa=[-90,0,90,180][q]*Math.PI/180,ea=([-90,0,90,180][q]+90)*Math.PI/180;var pd2="M"+cx+","+cy+" L"+(cx+rr*Math.cos(sa)).toFixed(1)+","+(cy+rr*Math.sin(sa)).toFixed(1)+" A"+rr+","+rr+" 0 0 1 "+(cx+rr*Math.cos(ea)).toFixed(1)+","+(cy+rr*Math.sin(ea)).toFixed(1)+" Z";return <svg key={q} width={130} height={130} style={{position:"absolute",top:0,left:0,pointerEvents:"none",touchAction:"none"}}><path d={pd2} fill={P.face} stroke={P.border} strokeWidth={2.5} style={{cursor:"grab",pointerEvents:"auto",touchAction:"none"}} onPointerDown={function(e){stSD("quad",q,e);}}/></svg>;})}<div style={{position:"absolute",left:62,top:62,width:6,height:6,borderRadius:"50%",background:"#999"}}/></div>
               </div>
               {/* Saat pulları */}
               <div style={{background:"#fff",borderRadius:14,padding:"12px",marginBottom:10,border:"1px solid rgba(0,0,0,.05)"}}>
